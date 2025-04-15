@@ -8,6 +8,7 @@
 #include <array>
 #include <string>
 
+#include "base/containers/span.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/win/scoped_gdi_object.h"
 #include "shell/browser/native_window.h"
@@ -52,6 +53,17 @@ bool GetThumbarButtonFlags(const std::vector<std::string>& flags,
   return true;
 }
 
+template <size_t N>
+static void CopyStringToBuf(wchar_t (&tgt_buf)[N],
+                            const std::wstring_view src_str) {
+  if constexpr (N < 1U)
+    return;
+  const auto src = base::span{src_str};
+  auto tgt = base::span{tgt_buf};
+  const auto n_bytes = std::min(src.size(), N - 1U);
+  tgt.first(n_bytes).copy_from(src.first(n_bytes));
+  tgt[n_bytes] = wchar_t{};
+}
 }  // namespace
 
 TaskbarHost::ThumbarButton::ThumbarButton() = default;
@@ -109,8 +121,7 @@ bool TaskbarHost::SetThumbarButtons(HWND window,
     // Set tooltip.
     if (!button.tooltip.empty()) {
       thumb_button.dwMask |= THB_TOOLTIP;
-      wcsncpy_s(thumb_button.szTip, base::UTF8ToWide(button.tooltip).c_str(),
-                _TRUNCATE);
+      CopyStringToBuf(thumb_button.szTip, base::UTF8ToWide(button.tooltip));
     }
 
     // Save callback.
